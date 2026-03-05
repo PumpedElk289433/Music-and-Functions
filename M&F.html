@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAV音频可视化工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#FF7D00',
+                        accent: '#00D4AA',
+                        dark: '#1E293B',
+                        light: '#F8FAFC'
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .glass-effect {
+                background: rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }
+            .animate-pulse-slow {
+                animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            }
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        canvas {
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .visualization-type {
+            transition: all 0.3s ease;
+        }
+        
+        .visualization-type:hover {
+            transform: translateY(-2px);
+        }
+        
+        .visualization-type.active {
+            background-color: rgba(22, 93, 255, 0.1);
+            border-color: #165DFF;
+            color: #165DFF;
+        }
+        
+        audio {
+            border-radius: 0.5rem;
+        }
+        
+        .upload-area {
+            transition: all 0.3s ease;
+        }
+        
+        .upload-area:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .upload-area.dragover {
+            background-color: rgba(22, 93, 255, 0.1);
+            border-color: #165DFF;
+        }
+    </style>
+</head>
+<body class="font-inter text-light">
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        <!-- 标题区域 -->
+        <header class="text-center mb-12">
+            <h1 class="text-[clamp(2rem,5vw,3.5rem)] font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent">
+                WAV音频可视化工具
+            </h1>
+            <p class="text-[clamp(1rem,2vw,1.25rem)] text-light/80 max-w-2xl mx-auto">
+                上传WAV音频文件，实时查看音频的波形图、频谱图和环形可视化效果
+            </p>
+        </header>
+        
+        <!-- 主要内容区域 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- 控制面板 -->
+            <div class="lg:col-span-1 space-y-6">
+                <!-- 文件上传区域 -->
+                <div class="glass-effect rounded-xl p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        <i class="fa fa-upload mr-2 text-primary"></i>
+                        音频文件
+                    </h2>
+                    
+                    <label for="audioFile" class="upload-area block w-full p-6 border-2 border-dashed border-light/30 rounded-lg text-center cursor-pointer">
+                        <input type="file" id="audioFile" accept=".wav" class="hidden">
+                        <i class="fa fa-file-audio-o text-4xl mb-3 text-light/60"></i>
+                        <p class="mb-2">点击选择WAV文件或拖拽到此处</p>
+                        <p class="text-sm text-light/60">支持WAV格式音频文件</p>
+                    </label>
+                    
+                    <!-- 音频播放器 -->
+                    <div class="mt-6">
+                        <audio id="audioPlayer" controls class="w-full bg-dark/30"></audio>
+                    </div>
+                </div>
+                
+                <!-- 可视化控制 -->
+                <div class="glass-effect rounded-xl p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        <i class="fa fa-bar-chart mr-2 text-secondary"></i>
+                        可视化效果
+                    </h2>
+                    
+                    <div class="space-y-3">
+                        <button class="visualization-type active w-full p-3 rounded-lg border border-light/20 text-left flex items-center justify-between" data-type="waveform">
+                            <span class="flex items-center">
+                                <i class="fa fa-area-chart mr-2"></i>
+                                波形图
+                            </span>
+                            <i class="fa fa-check text-primary"></i>
+                        </button>
+                        
+                        <button class="visualization-type w-full p-3 rounded-lg border border-light/20 text-left flex items-center justify-between" data-type="spectrum">
+                            <span class="flex items-center">
+                                <i class="fa fa-bar-chart mr-2"></i>
+                                频谱图
+                            </span>
+                        </button>
+                        
+                        <button class="visualization-type w-full p-3 rounded-lg border border-light/20 text-left flex items-center justify-between" data-type="circle">
+                            <span class="flex items-center">
+                                <i class="fa fa-bullseye mr-2"></i>
+                                环形频谱
+                            </span>
+                        </button>
+                        
+                        <button class="visualization-type w-full p-3 rounded-lg border border-light/20 text-left flex items-center justify-between" data-type="radial">
+                            <span class="flex items-center">
+                                <i class="fa fa-dot-circle-o mr-2"></i>
+                                径向频谱
+                            </span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 音频信息 -->
+                <div class="glass-effect rounded-xl p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        <i class="fa fa-info-circle mr-2 text-accent"></i>
+                        音频信息
+                    </h2>
+                    
+                    <div class="space-y-3 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-light/70">文件名:</span>
+                            <span id="fileName">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-light/70">时长:</span>
+                            <span id="duration">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-light/70">采样率:</span>
+                            <span id="sampleRate">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-light/70">声道数:</span>
+                            <span id="channels">-</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 函数表达式 -->
+                <div class="glass-effect rounded-xl p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        <i class="fa fa-calculator mr-2 text-secondary"></i>
+                        波形函数式
+                    </h2>
+                    
+                    <div class="bg-dark/30 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+                        <p id="functionExpression" class="text-light/80">
+                            y(t) = 0
+                        </p>
+                        <div class="mt-2 text-xs text-light/60">
+                            <p id="functionDescription">
+                                上传音频文件查看实时波形函数表达式
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 可视化区域 -->
+            <div class="lg:col-span-2">
+                <div class="glass-effect rounded-xl p-6 h-full">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        <i class="fa fa-eye mr-2 text-primary"></i>
+                        可视化效果
+                    </h2>
+                    
+                    <div class="relative">
+                        <canvas id="visualCanvas" class="w-full h-[500px] bg-dark/50"></canvas>
+                        
+                        <!-- 加载状态 -->
+                        <div id="loadingState" class="absolute inset-0 flex items-center justify-center bg-dark/70 rounded-lg">
+                            <div class="text-center">
+                                <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 text-primary mb-4"></div>
+                                <p class="text-lg">正在加载音频...</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 空状态 -->
+                        <div id="emptyState" class="absolute inset-0 flex items-center justify-center bg-dark/50 rounded-lg">
+                            <div class="text-center">
+                                <i class="fa fa-music text-6xl text-light/30 mb-4"></i>
+                                <p class="text-lg text-light/70">上传WAV音频文件开始可视化</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 底部说明 -->
+        <footer class="mt-12 text-center text-light/60 text-sm">
+            <p>使用HTML5 Audio API、Web Audio API和Canvas API实现</p>
+            <p class="mt-2">支持波形图、频谱图、环形频谱和径向频谱四种可视化效果</p>
+        </footer>
+    </div>
+
+    <script>
+        // 全局变量
+        let audioContext;
+        let audioElement;
+        let source;
+        let analyser;
+        let dataArray;
+        let timeDomainData;
+        let bufferLength;
+        let canvas;
+        let canvasCtx;
+        let visualizationType = 'waveform';
+        let isPlaying = false;
+        let dominantFrequencies = [];
+        
+        // DOM元素
+        const audioFileInput = document.getElementById('audioFile');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const visualCanvas = document.getElementById('visualCanvas');
+        const loadingState = document.getElementById('loadingState');
+        const emptyState = document.getElementById('emptyState');
+        const fileNameEl = document.getElementById('fileName');
+        const durationEl = document.getElementById('duration');
+        const sampleRateEl = document.getElementById('sampleRate');
+        const channelsEl = document.getElementById('channels');
+        const functionExpressionEl = document.getElementById('functionExpression');
+        const functionDescriptionEl = document.getElementById('functionDescription');
+        const visualizationButtons = document.querySelectorAll('.visualization-type');
+        
+        // 初始化
+        function init() {
+            canvasCtx = visualCanvas.getContext('2d');
+            
+            // 设置画布大小
+            function resizeCanvas() {
+                const container = visualCanvas.parentElement;
+                visualCanvas.width = container.clientWidth - 48; // 减去内边距
+                visualCanvas.height = 500;
+            }
+            
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // 音频文件上传
+            audioFileInput.addEventListener('change', handleFileUpload);
+            
+            // 拖拽上传
+            const uploadArea = document.querySelector('.upload-area');
+            uploadArea.addEventListener('dragover', handleDragOver);
+            uploadArea.addEventListener('drop', handleDrop);
+            uploadArea.addEventListener('dragleave', handleDragLeave);
+            
+            // 可视化类型切换
+            visualizationButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    visualizationType = button.dataset.type;
+                    updateVisualizationButtons();
+                });
+            });
+            
+            // 音频播放控制
+            audioPlayer.addEventListener('play', handlePlay);
+            audioPlayer.addEventListener('pause', handlePause);
+            audioPlayer.addEventListener('ended', handleEnded);
+        }
+        
+        // 处理文件上传
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                loadAudio(file);
+            }
+        }
+        
+        // 拖拽处理
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.currentTarget.classList.add('dragover');
+        }
+        
+        function handleDragLeave(event) {
+            event.currentTarget.classList.remove('dragover');
+        }
+        
+        function handleDrop(event) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('dragover');
+            
+            const file = event.dataTransfer.files[0];
+            if (file && file.type === 'audio/wav') {
+                loadAudio(file);
+            } else {
+                alert('请上传WAV格式的音频文件');
+            }
+        }
+        
+        // 加载音频文件
+        function loadAudio(file) {
+            // 显示加载状态
+            loadingState.style.display = 'flex';
+            emptyState.style.display = 'none';
+            
+            // 更新文件名
+            fileNameEl.textContent = file.name;
+            
+            // 创建文件URL
+            const fileURL = URL.createObjectURL(file);
+            audioPlayer.src = fileURL;
+            
+            // 等待音频加载
+            audioPlayer.addEventListener('loadedmetadata', function onLoadedMetadata() {
+                // 显示音频信息
+                durationEl.textContent = formatTime(audioPlayer.duration);
+                
+                // 创建AudioContext
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                // 重新连接音频图
+                connectAudioGraph();
+                
+                // 隐藏加载状态
+                loadingState.style.display = 'none';
+                
+                // 移除事件监听器
+                audioPlayer.removeEventListener('loadedmetadata', onLoadedMetadata);
+            });
+            
+            // 读取音频文件获取详细信息
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const arrayBuffer = e.target.result;
+                    audioContext.decodeAudioData(arrayBuffer, function(decodedData) {
+                        sampleRateEl.textContent = decodedData.sampleRate + ' Hz';
+                        channelsEl.textContent = decodedData.numberOfChannels;
+                    });
+                } catch (error) {
+                    console.error('解析音频数据时出错:', error);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        
+        // 连接音频处理图
+        function connectAudioGraph() {
+            if (source) {
+                source.disconnect();
+            }
+            
+            source = audioContext.createMediaElementSource(audioPlayer);
+            analyser = audioContext.createAnalyser();
+            
+            // 设置分析器参数
+            analyser.fftSize = 2048;
+            bufferLength = analyser.frequencyBinCount;
+            dataArray = new Uint8Array(bufferLength);
+            timeDomainData = new Uint8Array(bufferLength);
+            
+            // 连接节点
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+            
+            // 开始可视化
+            visualize();
+        }
+        
+        // 处理播放
+        function handlePlay() {
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            isPlaying = true;
+        }
+        
+        // 处理暂停
+        function handlePause() {
+            isPlaying = false;
+        }
+        
+        // 处理播放结束
+        function handleEnded() {
+            isPlaying = false;
+            // 清空画布
+            canvasCtx.fillStyle = 'rgba(30, 41, 59, 0.5)';
+            canvasCtx.fillRect(0, 0, visualCanvas.width, visualCanvas.height);
+            // 重置函数表达式
+            functionExpressionEl.textContent = 'y(t) = 0';
+            functionDescriptionEl.textContent = '音频已停止播放';
+        }
+        
+        // 分析主要频率成分
+        function analyzeDominantFrequencies() {
+            if (!analyser || !dataArray) return;
+            
+            const sampleRate = audioContext.sampleRate;
+            const frequencyStep = sampleRate / analyser.fftSize;
+            const frequencies = [];
+            
+            // 收集频率和振幅数据
+            for (let i = 0; i < bufferLength; i++) {
+                const frequency = i * frequencyStep;
+                const amplitude = dataArray[i] / 255;
+                
+                // 只考虑有意义的频率和振幅
+                if (frequency > 20 && frequency < 20000 && amplitude > 0.1) {
+                    frequencies.push({
+                        frequency: frequency,
+                        amplitude: amplitude
+                    });
+                }
+            }
+            
+            // 按振幅排序，取前5个主要频率
+            frequencies.sort((a, b) => b.amplitude - a.amplitude);
+            dominantFrequencies = frequencies.slice(0, 5);
+        }
+        
+        // 生成函数表达式
+        function generateFunctionExpression() {
+            if (dominantFrequencies.length === 0) {
+                return 'y(t) = 0';
+            }
+            
+            // 基础函数表达式
+            let expression = 'y(t) = ';
+            
+            // 添加每个频率成分
+            dominantFrequencies.forEach((freq, index) => {
+                if (index > 0) {
+                    expression += ' + ';
+                }
+                
+                // 格式化振幅和频率
+                const amplitude = (freq.amplitude * 0.8).toFixed(2);
+                const frequency = freq.frequency.toFixed(1);
+                
+                // 添加正弦波成分
+                expression += `${amplitude}·sin(2π·${frequency}·t)`;
+            });
+            
+            return expression;
+        }
+        
+        // 更新函数表达式显示
+        function updateFunctionDisplay() {
+            if (!isPlaying) {
+                functionExpressionEl.textContent = 'y(t) = 0';
+                functionDescriptionEl.textContent = '播放音频查看实时波形函数表达式';
+                return;
+            }
+            
+            // 分析主要频率
+            analyzeDominantFrequencies();
+            
+            // 生成函数表达式
+            const expression = generateFunctionExpression();
+            functionExpressionEl.textContent = expression;
+            
+            // 生成描述
+            let description = '主要频率成分：';
+            dominantFrequencies.forEach((freq, index) => {
+                if (index > 0) {
+                    description += ', ';
+                }
+                description += `${freq.frequency.toFixed(0)} Hz`;
+            });
+            
+            if (dominantFrequencies.length === 0) {
+                description = '当前音频无明显频率成分';
+            }
+            
+            functionDescriptionEl.textContent = description;
+        }
+        
+        // 更新可视化按钮状态
+        function updateVisualizationButtons() {
+            visualizationButtons.forEach(button => {
+                if (button.dataset.type === visualizationType) {
+                    button.classList.add('active');
+                    button.innerHTML = `
+                        <span class="flex items-center">
+                            ${button.querySelector('span').innerHTML}
+                        </span>
+                        <i class="fa fa-check text-primary"></i>
+                    `;
+                } else {
+                    button.classList.remove('active');
+                    button.innerHTML = `
+                        <span class="flex items-center">
+                            ${button.querySelector('span').innerHTML}
+                        </span>
+                    `;
+                }
+            });
+        }
+        
+        // 可视化函数
+        function visualize() {
+            // 清空画布
+            canvasCtx.fillStyle = 'rgba(30, 41, 59, 0.5)';
+            canvasCtx.fillRect(0, 0, visualCanvas.width, visualCanvas.height);
+            
+            if (isPlaying && analyser) {
+                // 获取时域和频域数据
+                analyser.getByteTimeDomainData(timeDomainData);
+                analyser.getByteFrequencyData(dataArray);
+                
+                // 更新函数表达式显示
+                updateFunctionDisplay();
+                
+                // 根据选择的可视化类型绘制
+                switch (visualizationType) {
+                    case 'waveform':
+                        drawWaveform();
+                        break;
+                    case 'spectrum':
+                        drawSpectrum();
+                        break;
+                    case 'circle':
+                        drawCircleSpectrum();
+                        break;
+                    case 'radial':
+                        drawRadialSpectrum();
+                        break;
+                }
+            }
+            
+            // 继续下一帧
+            requestAnimationFrame(visualize);
+        }
+        
+        // 绘制波形图
+        function drawWaveform() {
+            canvasCtx.lineWidth = 2;
+            canvasCtx.strokeStyle = '#165DFF';
+            canvasCtx.beginPath();
+            
+            const sliceWidth = visualCanvas.width / bufferLength;
+            let x = 0;
+            
+            for (let i = 0; i < bufferLength; i++) {
+                const v = timeDomainData[i] / 128.0;
+                const y = v * visualCanvas.height / 2;
+                
+                if (i === 0) {
+                    canvasCtx.moveTo(x, y);
+                } else {
+                    canvasCtx.lineTo(x, y);
+                }
+                
+                x += sliceWidth;
+            }
+            
+            canvasCtx.stroke();
+            
+            // 绘制中线
+            canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            canvasCtx.lineWidth = 1;
+            canvasCtx.beginPath();
+            canvasCtx.moveTo(0, visualCanvas.height / 2);
+            canvasCtx.lineTo(visualCanvas.width, visualCanvas.height / 2);
+            canvasCtx.stroke();
+        }
+        
+        // 绘制频谱图
+        function drawSpectrum() {
+            const barWidth = visualCanvas.width / bufferLength;
+            let x = 0;
+            
+            for (let i = 0; i < bufferLength; i++) {
+                const barHeight = (dataArray[i] / 255) * visualCanvas.height;
+                
+                // 创建渐变效果
+                const gradient = canvasCtx.createLinearGradient(0, visualCanvas.height, 0, visualCanvas.height - barHeight);
+                gradient.addColorStop(0, '#165DFF');
+                gradient.addColorStop(0.5, '#00D4AA');
+                gradient.addColorStop(1, '#FF7D00');
+                
+                canvasCtx.fillStyle = gradient;
+                canvasCtx.fillRect(x, visualCanvas.height - barHeight, barWidth - 1, barHeight);
+                
+                x += barWidth;
+            }
+        }
+        
+        // 绘制环形频谱
+        function drawCircleSpectrum() {
+            const centerX = visualCanvas.width / 2;
+            const centerY = visualCanvas.height / 2;
+            const maxRadius = Math.min(centerX, centerY) * 0.8;
+            
+            canvasCtx.save();
+            canvasCtx.translate(centerX, centerY);
+            
+            // 绘制外圈
+            canvasCtx.beginPath();
+            canvasCtx.arc(0, 0, maxRadius, 0, Math.PI * 2);
+            canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            canvasCtx.lineWidth = 2;
+            canvasCtx.stroke();
+            
+            // 绘制频谱环
+            const sliceAngle = (Math.PI * 2) / bufferLength;
+            
+            for (let i = 0; i < bufferLength; i++) {
+                const amplitude = dataArray[i] / 255;
+                const radius = maxRadius * amplitude;
+                const angle = i * sliceAngle;
+                
+                // 只绘制前一半的频率（后一半是镜像）
+                if (i < bufferLength / 2) {
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(0, 0, radius, angle, angle + sliceAngle * 0.8);
+                    
+                    // 根据频率设置颜色
+                    const hue = (i / (bufferLength / 2)) * 240; // 从蓝色到红色
+                    canvasCtx.strokeStyle = `hsl(${hue}, 100%, 50%)`;
+                    canvasCtx.lineWidth = 3;
+                    canvasCtx.stroke();
+                }
+            }
+            
+            canvasCtx.restore();
+        }
+        
+        // 绘制径向频谱
+        function drawRadialSpectrum() {
+            const centerX = visualCanvas.width / 2;
+            const centerY = visualCanvas.height / 2;
+            const maxRadius = Math.min(centerX, centerY) * 0.8;
+            
+            canvasCtx.save();
+            canvasCtx.translate(centerX, centerY);
+            
+            // 绘制同心圆背景
+            for (let i = 0; i < 5; i++) {
+                canvasCtx.beginPath();
+                canvasCtx.arc(0, 0, (maxRadius / 5) * i, 0, Math.PI * 2);
+                canvasCtx.strokeStyle = `rgba(255, 255, 255, ${0.05 + (i * 0.05)})`;
+                canvasCtx.lineWidth = 1;
+                canvasCtx.stroke();
+            }
+            
+            // 绘制径向线
+            const sliceAngle = (Math.PI * 2) / bufferLength;
+            
+            for (let i = 0; i < bufferLength; i++) {
+                const amplitude = dataArray[i] / 255;
+                const radius = maxRadius * amplitude;
+                const angle = i * sliceAngle;
+                
+                // 只绘制前一半的频率
+                if (i < bufferLength / 2) {
+                    canvasCtx.beginPath();
+                    canvasCtx.moveTo(0, 0);
+                    canvasCtx.lineTo(
+                        Math.cos(angle) * radius,
+                        Math.sin(angle) * radius
+                    );
+                    
+                    // 根据频率设置颜色
+                    const hue = (i / (bufferLength / 2)) * 240;
+                    canvasCtx.strokeStyle = `hsl(${hue}, 100%, 50%)`;
+                    canvasCtx.lineWidth = 2;
+                    canvasCtx.stroke();
+                }
+            }
+            
+            canvasCtx.restore();
+        }
+        
+        // 格式化时间
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return '-';
+            
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
